@@ -9,10 +9,7 @@ and policy-as-prompt judgments diverge.
 ## What is / is NOT in this repo
 
 This repo contains **code and structure only**. The collected dataset,
-images, and LLM outputs are intentionally absent — they contain real
-user content (including moderated/removed posts) and are kept local for
-privacy and platform-ToS reasons. Anyone with this repo regenerates the
-data themselves by running the pipeline.
+images, and LLM outputs are intentionally absent
 
 ## Structure
 
