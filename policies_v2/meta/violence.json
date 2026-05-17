@@ -1,0 +1,50 @@
+{
+  "platform": "meta",
+  "category": "violence",
+  "policy_name": "Violence and Incitement",
+  "source_url": "https://transparency.meta.com/policies/community-standards/violence-incitement/",
+  "date_captured": "2026-05-16",
+  "capture_method": "full rendered text, manual",
+  "policy_rationale": "Meta aims to prevent potential offline violence related to content on its platforms. It removes language that incites or facilitates violence and credible threats to public or personal safety, including violent speech targeting people based on protected characteristics or immigration status. It distinguishes casual or awareness-raising statements from credible threats, considering language, context, public visibility, and physical-safety risk. Aspirational or conditional threats directed at terrorists/violent actors are deemed non-credible absent specific evidence.",
+  "prohibited": [
+    "Threats of violence that could lead to death or other high-severity violence against any target (statements of intent, calls for action, advocacy, expressions of hope, aspirational statements, conditional statements)",
+    "Threats of violence that could lead to serious injury (mid-severity): removed against public figures and non-protected groups when credible; removed against all other targets including protected-characteristic groups regardless of credibility",
+    "Admissions to high- or mid-severity violence, except in contexts of redemption, self-defense, contact sports (mid or less), or when committed by law enforcement/military/state security",
+    "Threats or depictions of kidnapping/abduction, unless shared by a victim/family as a plea for help or for informational, condemnation, or awareness-raising purposes",
+    "Threats of low-severity violence against private adults (self-reported), children, and people/groups targeted on protected characteristics",
+    "Asking for, offering, or admitting to offering high-severity violence services (e.g., hitmen, mercenaries, assassins, FGM) or advocating their use",
+    "Instructions to make/use weapons with explicit stated goal to seriously injure or kill people, or imagery showing/simulating that end result, absent non-violent-purpose context (educational self-defense, military training)",
+    "Instructions to make/use explosives, absent non-violent-purpose context (fireworks, commercial games, fishing)",
+    "Threats to take up or bring weapons to, or forcibly enter, a location (places of worship, schools, polling/election locations, or sites with heightened risk signals)",
+    "Threats of violence related to voting, voter registration, or election administration/outcome, even with no target",
+    "Glorification of gender-based violence that is intimate partner violence or honor-based violence"
+  ],
+  "context_required": [
+    "Threats against law enforcement officers or election officials, regardless of public-figure status or threat credibility",
+    "Coded/veiled threats where method is not articulated, requiring both a threat signal (retaliatory context, reference to historical/fictional violence, threatening call to action, or showing knowledge of sensitive info exposing the target) AND a contextual signal (local context confirms imminence, target reports it, or target is a child)",
+    "Implicit threats to bring armaments to high-risk locations",
+    "Election-corruption claims combined with a violence signal (weapon threat, weapon depiction, arson/theft/vandalism references)",
+    "References to election gatherings combined with a violence signal",
+    "High/mid-severity violence threats in defense of self/another meeting strict proportionality and immediacy criteria"
+  ],
+  "allowed": [
+    "Casual or non-serious expressions of disdain or disagreement framed as violence with no credible threat",
+    "Threats shared in awareness-raising or condemning context",
+    "Less-severe threats in the context of contact sports",
+    "Aspirational/conditional threats directed at terrorists or other violent actors (deemed non-credible absent specific evidence, e.g., 'I hope they kill the terrorists')",
+    "Weapon/explosive instructions with clear non-violent purpose (educational self-defense, military training, recreation)"
+  ],
+  "examples_violating": [
+    "I'm going to kill you and I know exactly where you sleep",
+    "Everyone bring weapons to the polling station on election day",
+    "DM me, I offer professional hitman services, serious inquiries only",
+    "Here's the exact recipe to build a bomb to kill the people at [target]"
+  ],
+  "examples_allowed": [
+    "I'll kill for a good night's sleep right now",
+    "Terrorists deserve whatever they get",
+    "This footage documents the attack so people understand what happened",
+    "Coach said he'll destroy us in practice if we're late"
+  ],
+  "enforcement": "Primary action is REMOVE; severe cases lead to account disablement and law-enforcement referral. Coded/veiled and defense-of-self cases need additional context and may not be actioned on text alone (treat as KEEP with low confidence unless contextual signals are present in the post)."
+}

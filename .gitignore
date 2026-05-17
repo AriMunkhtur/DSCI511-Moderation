@@ -1,0 +1,44 @@
+# ===================================================================
+# .gitignore  -  what Git must NEVER track
+# This file must be committed FIRST, before any data exists.
+# ===================================================================
+
+# --- The database (scraped content - never on GitHub) ---
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+moderation.db
+moderation_smoketest.db
+
+# --- Collected content / media (privacy + size + ToS) ---
+media/
+data/
+raw_responses/
+collected/
+
+# --- Local LLM artifacts ---
+*.gguf
+models/
+ollama/
+
+# --- Secrets / credentials ---
+.env
+*.key
+credentials.json
+secrets.*
+
+# --- Python noise ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

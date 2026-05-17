@@ -1,0 +1,57 @@
+{
+  "platform": "meta",
+  "category": "spam",
+  "policy_name": "Spam (consolidated with Fraud/Scams/Deceptive Practices, Inauthentic Behavior, and Cybersecurity)",
+  "source_url": [
+    "https://transparency.meta.com/policies/community-standards/spam/",
+    "https://transparency.meta.com/policies/community-standards/fraud-scams-deceptive-practices/",
+    "https://transparency.meta.com/policies/community-standards/inauthentic-behavior/",
+    "https://transparency.meta.com/policies/community-standards/cybersecurity/"
+  ],
+  "date_captured": "2026-05-16",
+  "capture_method": "full rendered text, manual, four pages consolidated",
+  "consolidation_note": "Meta splits spam-adjacent violations across four pages. X consolidates equivalents into one Platform Manipulation page. This JSON merges Meta's four to make the Meta-vs-X comparison fair at the category level. Record this in the methodology - it is the rule-count-asymmetry control point.",
+  "policy_rationale": "Meta prohibits content designed to deceive, mislead, or overwhelm users to artificially increase viewership, plus deceptive links, domain impersonation, scams/fraud that extract money or data, coordinated inauthentic networks, and unauthorized account access. Awareness-raising and condemnation of fraud/scams without revealing sensitive info is allowed.",
+  "prohibited": [
+    "Posting/sharing/engaging or creating assets at very high frequencies (manual or automated)",
+    "Selling, buying, or exchanging platform assets (accounts, groups, pages) or site privileges (admin/mod roles, posting permissions)",
+    "Selling/buying/exchanging content for monetary value except clearly identified Branded Content",
+    "Selling/buying/exchanging engagement (likes, shares, views, follows, clicks, hashtags), including giveaways of cash/equivalents for engagement and engagement-gating to view content",
+    "Cloaking: presenting different off-platform content to integrity systems versus users",
+    "Misleading links: a link promising one type of content but delivering substantially different content",
+    "Deceptive redirect behavior: required action then domain change / auto-redirect to a substantially different domain",
+    "Like/share-gating to access exclusive content",
+    "Deceptive platform-functionality mimicry (fake fundraisers, polls, play/like buttons) to drive link follows",
+    "Deceptive landing-page functionality (pop-ups/unders, clickjacking, trapping)",
+    "Landing page or domain impersonation of a reputable brand via typos/misspellings",
+    "FRAUD/SCAM - loan, gambling, investment/financial, money-mule/laundering, charity, romance, business-impersonation, government-grant, illuminati/spiritual, insurance, job, debt-relief, giveaway, advance-fee scams",
+    "FRAUD/SCAM - fake/forged documents, counterfeit currency/vouchers, fake certificates, carding, PII trading, fake reviews, subscription-credential trading, exam cheating, device manipulation, unauthorized digital-content devices",
+    "INAUTHENTIC - creating/using inauthentic Meta assets to deceive about identity/origin of an audience or to evade enforcement; misusing reporting systems to harass/silence",
+    "INAUTHENTIC - Coordinated Inauthentic Behavior and Foreign Interference (context-required)",
+    "CYBERSECURITY - phishing, social engineering, malware/spyware/greyware distribution, hacking facilitation, abusive-link infrastructure"
+  ],
+  "context_required": [
+    "Fraud/scam reported by a trusted entity; bribery/embezzlement; scam vaccines; fake-persona/celebrity-impersonation scams; surveillance-device sales; impersonation-based litigant recruitment; PII-prompting subscriptions",
+    "Coordinated Inauthentic Behavior, Foreign Interference, and state-actor denial of force violating UN Charter Art. 2(4)"
+  ],
+  "allowed": [
+    "Cross-promotion not triggered by payment to a third party",
+    "Transferring admin/mod responsibilities based on interest rather than exchange of value",
+    "Posting or sharing clearly identified Branded Content",
+    "Content that condemns, raises awareness of, or educates about fraud/scams without revealing sensitive info or promoting the scam",
+    "Satirical content where violating elements are clearly satirized or attributed to mock/criticize"
+  ],
+  "examples_violating": [
+    "Send $200 now and I'll wire you back $2000 guaranteed, government grant program",
+    "Like + share + tag 5 friends to unlock the secret link",
+    "Buy verified aged accounts and 10k followers, DM for price list",
+    "Click here to re-verify your account [link impersonates the platform login]"
+  ],
+  "examples_allowed": [
+    "PSA: this 'free grant' message going around is a scam, don't send money",
+    "New episode out now, link in bio [transparent self-promotion]",
+    "Branded Content: paid partnership with [brand], clearly disclosed",
+    "Handing the group over to the most active member, no payment involved"
+  ],
+  "enforcement": "Primary action is REMOVE; persistent or networked violations lead to account/asset disablement. Some weight-loss/misleading-health content is age-gated rather than removed. CIB/Foreign-Interference items are context-required (KEEP with low confidence unless the post itself shows the network/deception)."
+}

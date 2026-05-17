@@ -1,0 +1,48 @@
+{
+  "platform": "x",
+  "category": "hate_speech",
+  "policy_name": "Hateful Conduct",
+  "source_url": "https://help.x.com/en/rules-and-policies/hateful-conduct-policy",
+  "date_captured": "2026-05-16",
+  "policy_version": "April 2023 (per document header)",
+  "capture_method": "full text markdown, manual",
+  "policy_rationale": "X prohibits directly attacking other people on the basis of protected categories. It targets abuse motivated by hatred/prejudice/intolerance, especially abuse that silences historically marginalized voices. Enforcement scales with severity: severe/repetitive slur or trope usage to harass/intimidate may require Post removal; moderate/isolated usage may instead get visibility limits. Context within a larger conversation (including consensual reclaimed use) can make otherwise-hateful content non-violating.",
+  "protected_characteristics": [
+    "race", "ethnicity", "national origin", "caste", "sexual orientation",
+    "gender", "gender identity", "religious affiliation", "age", "disability", "serious disease"
+  ],
+  "prohibited": [
+    "Hateful references: targeting individuals/groups with content referencing violence or violent events where a protected category was the primary target/victim, with intent to harass (e.g., genocides like the Holocaust, lynchings)",
+    "Incitement - inciting fear or spreading fearful stereotypes about a protected category (e.g., 'all [religious group] are terrorists')",
+    "Incitement - inciting others to harass members of a protected category on or off platform",
+    "Incitement - inciting others to discriminate via denial of economic support to an individual/group due to protected-category membership (excludes genuine political commentary/boycotts/protests)",
+    "Slurs and Tropes: targeting others with repeated slurs, tropes, or content intended to degrade or reinforce negative/harmful stereotypes about a protected category",
+    "Dehumanization of a group based on religion, caste, age, disability, serious disease, national origin, race, ethnicity, gender, gender identity, or sexual orientation",
+    "Hateful Imagery: logos/symbols/images whose purpose is to promote hostility/malice based on a protected category (e.g., Nazi swastika, dehumanizing alterations, Holocaust-referencing manipulations)",
+    "Hateful Imagery in live video, account bio, profile, or header; sending an individual unsolicited hateful imagery",
+    "Hateful Profile: using hateful images/symbols in profile image or header; using username/display name/bio for targeted harassment or expressing hate toward a person/group/protected category"
+  ],
+  "context_required": [
+    "Slur/trope usage where it is unclear whether context is abusive or part of a consensual reclaimed conversation - X may need to hear from the targeted person before acting",
+    "Posts that appear hateful in isolation but may not be within a larger conversation"
+  ],
+  "allowed": [
+    "Reclaimed/consensual in-group use of terms typically considered slurs, where context is not abusive",
+    "Content where larger-conversation context shows non-abusive intent",
+    "Political commentary, or content relating to boycotts or protests, that is not inciting discrimination based on protected category",
+    "Counterspeech, condemnation, or reporting of hateful content"
+  ],
+  "examples_violating": [
+    "All [religious group] are terrorists and shouldn't be allowed here",
+    "If you see anyone wearing [religious symbol], grab it off them and post the pics",
+    "[repeated slur targeting someone for their protected category, to harass]",
+    "Profile header set to a Nazi swastika"
+  ],
+  "examples_allowed": [
+    "Quoting a hateful reply to call it out and condemn it",
+    "Members of the community using a reclaimed term among themselves",
+    "I'm boycotting [business] over its political stance [policy/boycott commentary]",
+    "Academic post analyzing historical hate propaganda"
+  ],
+  "enforcement": "Graduated. Severe/repetitive slur or trope usage to harass/intimidate: Post removal (REMOVE) and possible read-only period. Moderate/isolated usage to harass: visibility restriction (LABEL / reduced reach). Hateful Profile violations: account suspension. Reclaimed/contextual use: KEEP. Ambiguous slur context: KEEP with low confidence (X may require target self-report)."
+}

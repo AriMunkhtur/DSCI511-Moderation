@@ -1,0 +1,54 @@
+{
+  "platform": "meta",
+  "category": "hate_speech",
+  "policy_name": "Hateful Conduct",
+  "source_url": "https://transparency.meta.com/policies/community-standards/hateful-conduct/",
+  "date_captured": "2026-05-16",
+  "capture_method": "full rendered text, manual",
+  "policy_rationale": "Meta defines hateful conduct as direct attacks against people (not concepts or institutions) based on protected characteristics (PCs): race, ethnicity, national origin, disability, religious affiliation, caste, sexual orientation, sex, gender identity, serious disease. Age is a PC when referenced with another PC. Refugees/migrants/immigrants/asylum seekers are protected from the most severe (Tier 1) attacks, though commentary/criticism of immigration policy is allowed. Speech is split into Tier 1 (severe) and Tier 2. Slurs/others' speech used to condemn, report, self-reference, or empower are allowed where intent is clear; ambiguous intent may be removed.",
+  "protected_characteristics": [
+    "race", "ethnicity", "national origin", "disability", "religious affiliation",
+    "caste", "sexual orientation", "sex", "gender identity", "serious disease",
+    "age (only when referenced with another PC)"
+  ],
+  "prohibited": [
+    "TIER 1 - Dehumanizing speech: comparisons/generalizations to insects, culturally-inferior animals, bacteria/viruses/microbes, or subhumanity (savages, devils, monsters)",
+    "TIER 1 - Allegations of serious immorality/criminality: sexual predators/pedophiles, violent criminals (terrorists, murderers) tied to a PC",
+    "TIER 1 - Calls and hopes for harm (disease, natural disaster, self-injury/suicide, death without perpetrator, accidents) targeting a PC",
+    "TIER 1 - Harmful stereotypes historically linked to intimidation/violence (Blackface; Holocaust denial; claims Jewish people control financial/political/media institutions; Dalits as menial laborers; comparing Black people to farm equipment)",
+    "TIER 1 - Mocking the concept, events, or victims of hate crimes even if no real person depicted",
+    "TIER 1 - Mocking people for having or experiencing a disease",
+    "TIER 1 - Content that describes or negatively targets people with slurs (words that inherently create exclusion/intimidation tied to historical discrimination)",
+    "TIER 2 - Calls/support for exclusion or segregation: general ('No X allowed!'), political, economic, or social exclusion targeting a PC (with stated exceptions for some sex/gender-based space limits and certain religiously-based content)",
+    "TIER 2 - Insults about character (cowardice, dishonesty, criminality, sexual immorality), mental characteristics (stupidity, mental illness), or other (worthlessness, ugliness, dirtiness) targeting a PC",
+    "TIER 2 - Expressions suggesting the target causes sickness ('make me vomit')",
+    "TIER 2 - Targeted cursing at a PC ('Fuck the [PC]!', 'suck my dick' directed at a PC), except certain gender-based cursing in a romantic break-up context"
+  ],
+  "context_required": [
+    "Content offering products/services to change sexual orientation or gender identity",
+    "Attacks on concepts/institutions/ideas/practices/beliefs associated with PCs that are likely to contribute to imminent physical harm, intimidation, or discrimination (Meta weighs incitement potential, heightened-tension periods, recent violence history, speaker authority)"
+  ],
+  "allowed": [
+    "Slurs or others' speech shared to condemn or report on it, where intent is clear",
+    "Self-referential or empowering use of slurs by in-group members where intent is clear",
+    "Commentary on and criticism of immigration policies",
+    "Sex/gender-exclusive language re: access to spaces commonly limited by sex/gender (bathrooms, sports, support groups, specific schools)",
+    "Allegations of mental illness/abnormality based on gender or sexual orientation given political/religious discourse (explicitly carved out by policy)",
+    "Gender-based limitations of military/law-enforcement/teaching jobs; same based on sexual orientation when religiously grounded",
+    "Cursing at a gender in a romantic break-up context",
+    "Satirical content where violating elements are clearly satirized or attributed to mock/criticize"
+  ],
+  "examples_violating": [
+    "[protected group] are cockroaches infesting our country",
+    "Holocaust never happened, it's a hoax invented by [group]",
+    "No [protected group] allowed in this neighborhood",
+    "[slur] targeting someone for their [protected characteristic]"
+  ],
+  "examples_allowed": [
+    "Sharing a screenshot of a slur to report the account that posted it",
+    "I think this country's immigration policy is too lenient",
+    "Within our community we've reclaimed this term among ourselves",
+    "Bathrooms in this school should remain sex-separated"
+  ],
+  "enforcement": "Primary action is REMOVE for Tier 1 and Tier 2 attacks. Context-required items and ambiguous-intent slur usage may be KEEP with low confidence unless the post itself supplies the disqualifying context."
+}

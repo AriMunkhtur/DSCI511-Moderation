@@ -1,0 +1,55 @@
+{
+  "platform": "x",
+  "category": "violence",
+  "policy_name": "Violent Content (Violent Speech + Violent Media)",
+  "source_url": "https://help.x.com/en/rules-and-policies/violent-speech",
+  "date_captured": "2026-05-16",
+  "policy_version": "February 2025 (per document header)",
+  "capture_method": "full text markdown, manual",
+  "policy_rationale": "X allows sharing graphic media if properly labeled, not prominently displayed, and not excessively gory or depicting sexual violence, but prohibits explicitly threatening, inciting, glorifying, or expressing desire for violence. X uses proportionate, severity-and-likelihood-based enforcement: high-severity content is removed; lower-severity or context-mitigated content gets restricted reach; clearly non-abusive context is allowed.",
+  "prohibited": [
+    "Violent Threats: threats to inflict physical harm (kill, torture, sexually assault, otherwise hurt), including threats to damage civilian homes/shelters or essential infrastructure",
+    "Wish of Harm: wishing, hoping, or expressing desire for others to die, suffer illness, tragic incidents, or physically harmful consequences",
+    "Incitement of Violence: inciting/promoting/encouraging others to commit violence or harm, encouraging self-harm, or inciting atrocity crimes (crimes against humanity, war crimes, genocide)",
+    "Glorification of Violence: glorifying/praising/celebrating acts of violence where harm occurred, including praising harm by Violent Entities and glorifying animal abuse/cruelty",
+    "Violent Speech in highly visible areas (live video, profile, header, bio, list banner, community cover)",
+    "Violent Sexual Conduct media: violence (real or simulated) with sexual acts, rape, violent sexual assault, non-consensual sexualized violence",
+    "Gratuitous Gore media: excessively graphic/gruesome death, violence, or severe harm (dismembered/mutilated humans, charred remains, exposed organs/bones, animal torture/killing)",
+    "Bestiality & Necrophilia media",
+    "Violent Media in highly visible areas, or targeting someone nonconsensually with unwanted Violent Media"
+  ],
+  "restricted_reach": [
+    "Violent Speech where harm is minor or non-deliberate",
+    "Context is self-defense or military conflict",
+    "Context is outrage/reactive against perpetrators of major harm",
+    "The target is unclear",
+    "Coded language ('dog whistles') indirectly inciting violence",
+    "Graphic Media that is properly labeled with a content warning (violent crimes/accidents, physical fights, bodily fluids, serious wounds, severely injured animals, non-excessive graphic injury/death)",
+    "Excessively gory media tied to newsworthy events, awareness-raising, or political-action calls, properly labeled"
+  ],
+  "allowed": [
+    "Hyperbolic and consensual speech between friends, or during video game / sporting event discussion",
+    "Figures of speech, satire, or artistic expression where context expresses a viewpoint rather than instigating actionable violence",
+    "Quotes from books/movies, music lyrics, or poetry expressing a viewpoint rather than instigating violence",
+    "Violence depicting animals from hunting/fishing, food processing, bullfighting, or religious sacrifice (unless excessively gory)",
+    "Painted or illustrated art portraying violence",
+    "Humor or satire including memes",
+    "Physical recovery/medical content (scars, healed wounds, stitches, prosthetics)",
+    "Simulated blood for events, protests, entertainment, or art",
+    "Historical content (history books, museum stills)",
+    "Explosions, altercations, property destruction, surveillance media, or shootings with no prohibited Violent Media present"
+  ],
+  "examples_violating": [
+    "I'm going to find you and beat you until you can't walk",
+    "I hope that whole family dies in a fire",
+    "Everyone go attack the [group] gathering tonight, hurt as many as you can",
+    "[graphic gore image of a mutilated body posted unlabeled and prominent]"
+  ],
+  "examples_allowed": [
+    "I'm going to obliterate you in this match tonight [gaming]",
+    "Quoting a war novel: 'they marched the prisoners to their deaths' [literary context]",
+    "Footage of a protest with simulated blood for artistic effect, labeled",
+    "Hunting photo showing a field-dressed deer [food/hunting context, not excessively gory]"
+  ],
+  "enforcement": "High-severity Violent Speech/Media: REMOVE (must be removed), repeat violations -> read-only mode or suspension. Severity/likelihood-mitigated cases: LABEL / restricted reach. Clear non-abusive context: KEEP. Properly labeled graphic media: KEEP with label (LABEL action)."
+}

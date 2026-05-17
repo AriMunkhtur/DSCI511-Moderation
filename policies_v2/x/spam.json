@@ -1,0 +1,52 @@
+{
+  "platform": "x",
+  "category": "spam",
+  "policy_name": "Authenticity (Inauthentic Accounts, Behaviors, and Content)",
+  "source_url": "https://help.x.com/en/rules-and-policies/authenticity",
+  "date_captured": "2026-05-16",
+  "policy_version": "April 2025 (per document header)",
+  "capture_method": "full text markdown read from disk, manual",
+  "policy_rationale": "X prohibits inauthentic activity that undermines platform integrity: inauthentic accounts (unauthorized automation, fake personas, impersonation, coordinated multi-account manipulation, ban evasion, account compromise), inauthentic behaviors (content spam, engagement spam, scams), and inauthentic content (synthetic/manipulated or out-of-context media, malicious URLs). This is X's structural equivalent of Meta's consolidated spam+fraud+inauthentic+cyber set.",
+  "prohibited": [
+    "Unauthorized automation: automated/scripted accounts not complying with the Developer Policy",
+    "Fake personas: manufactured identities using stock/stolen/AI-generated profile photos, copied/stolen bios, or misleading profile info to deceive",
+    "Impersonation of individuals/groups/organizations to deceive (non-compliant Parody/Commentary/Fan accounts)",
+    "Coordinated multi-account manipulation: operating multiple accounts interacting with the same/similar content to inflate prominence (boosting trends/hashtags, co-engaging posts/polls, mention/reply misuse, self-amplification)",
+    "Operating multiple accounts posting substantially similar/identical content (cross-posting; non-localized duplicates to the same trends/hashtags)",
+    "Workarounds exceeding the 10-account technical creation limit",
+    "Ban evasion: new accounts, imitating a suspended account, repurposing an account, or having someone operate it on your behalf to evade enforcement",
+    "Account compromise: unauthorized access or modification of someone's X account",
+    "Content Spam: bulk/aggressive high-volume unsolicited replies/mentions/DMs; manipulative hashtag use; excessive unrelated hashtags; bulk uncommented link posting; irrelevant reply promotion; post-and-delete cycling; copypasta/identical duplicate posting; deceptive edits reusing existing engagement to amplify substantially different content; editing URLs so the final destination significantly changes",
+    "Engagement Spam: trading/buying/selling/soliciting accounts; coordinating to exchange engagement (Likes, Polls, Replies, Reposts, Lists, Views, Follows); paid metric inflation; follow churn; indiscriminate following; automated aggressive engagement; aggressive list/moment adds; follower duplication; using/promoting third-party engagement services; mass false/duplicate reporting; coordinating report-feature misuse to harass",
+    "Scams: scam tactics to obtain money/property/private info, including social engineering/trust-building schemes, money-flipping, fraudulent discounts, phishing",
+    "Synthetic and Manipulated Media: sharing significantly and deceptively altered/fabricated media (incl. AI-simulated real persons) that fundamentally changes meaning and can cause widespread confusion, public-safety impact, or serious harm",
+    "Out-of-context media: unmanipulated media shared deceptively with false context about source/location/time/authenticity/identity or fabricated claims, causing the same harms",
+    "Malicious URLs: links causing malware harm, phishing/privacy compromise, or deceptive redirects to unexpected destinations"
+  ],
+  "context_required": [
+    "Synthetic/manipulated or out-of-context media where X cannot reliably determine if it is misleading - X may not take action",
+    "Coordinated multi-account or report-feature misuse generally requires assessing coordination/intent across accounts, not a single post in isolation"
+  ],
+  "allowed": [
+    "Operating up to 10 accounts with distinct identities/purposes (space-tracking, different teams in a league, hobbies/business, localized brand accounts in different languages, social-media-manager third-party operation, org chapters/branches, personal + pseudonymous/hobby accounts)",
+    "Authentically coordinating with others to express ideas/support/opposition to a cause in a non-violative manner",
+    "Compliant Parody, Commentary, and Fan (PCF) accounts meeting ALL label/avatar/name/bio requirements",
+    "LEO/NGO automated report submission with prior X consent and identification",
+    "Manually submitting good-faith reports; encouraging good-faith use of reporting for support queries",
+    "Sharing manipulated or out-of-context media in non-deceptive ways",
+    "X not intervening in financial disputes between users (sale-of-goods claims, disputed refunds, poor-quality-goods complaints)"
+  ],
+  "examples_violating": [
+    "Operating 30 accounts that all repost my product link to fake a trending topic",
+    "Buy/sell aged X accounts and coordinated like-and-repost packages, DM me",
+    "Copypasta: identical promotional reply pasted under 150 posts in an hour",
+    "Deceptively edited video of a public figure shared as authentic to mislead about a public issue"
+  ],
+  "examples_allowed": [
+    "Running separate English, Spanish, and French brand accounts [localized, within 10-account limit]",
+    "A clearly labeled 'Parody' account meeting all PCF requirements",
+    "An NGO submitting bulk reports through its verified affiliated account with prior consent",
+    "Sharing a known edited meme in an obviously non-deceptive, humorous way"
+  ],
+  "enforcement": "Severity- and history-based. Options: anti-spam challenges (account lock + verification), URL denylisting, restricting reach (LABEL / reduced visibility), temporary feature loss, profile modification (esp. non-compliant PCF), suspension. Severe violations: permanent suspension at first detection (REMOVE + suspend). Isolated/first offense: post deletion or temporary lock. Multi-account violation: keep one account, suspend the rest."
+}
