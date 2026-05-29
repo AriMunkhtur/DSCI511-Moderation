@@ -18,6 +18,9 @@ schema.sql              SQLite schema. Build the DB from this.
 smoke_test.py           Run first. Proves schema + environment work.
 src/
   prompt_builder_v2.py  Builds LLM prompts from policy + post. Pure, tested.
+  collect_bluesky.py    Fetches data using the BlueSky API and stores it in DB.
+  collect_lemmy.py      Fetches data using the Lemmy Open API and stores it in DB.
+  db_writer.py          A wrapper to interact with the SQLite3 database under the hood.
 prompts/
   template_text.txt     Prompt template, text-only posts.
   template_vision.txt    Prompt template, posts with images.
@@ -40,13 +43,13 @@ policies_v2/
 
 ## Components
 
-| Component | Status | Owner |
-|-----------|--------|-------|
-| Schema | Done | Ari |
-| Prompt builder | Done, tested | Ari |
-| Policy JSONs | Done | Ari |
-| Collector (Bluesky + Lemmy) | Not built | Jayesh |
-| LLM runner (Ollama) | Not built | Ari |
+| Component                   | Status       | Owner  |
+| --------------------------- | ------------ | ------ |
+| Schema                      | Done         | Ari    |
+| Prompt builder              | Done, tested | Ari    |
+| Policy JSONs                | Done         | Ari    |
+| Collector (Bluesky + Lemmy) | Not built    | Jayesh |
+| LLM runner (Ollama)         | Not built    | Ari    |
 
 ## Locked design decisions
 
