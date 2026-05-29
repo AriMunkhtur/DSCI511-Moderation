@@ -48,7 +48,7 @@ policies_v2/
 | Schema                      | Done         | Ari    |
 | Prompt builder              | Done, tested | Ari    |
 | Policy JSONs                | Done         | Ari    |
-| Collector (Bluesky + Lemmy) | Not built    | Jayesh |
+| Collector (Bluesky + Lemmy) | Done         | Jayesh |
 | LLM runner (Ollama)         | Not built    | Ari    |
 
 ## Locked design decisions
