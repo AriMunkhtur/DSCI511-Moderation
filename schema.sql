@@ -1,7 +1,7 @@
 -- ===================================================================
--- moderation.db  schema  (DSCI-511 class scope)
+-- moderation.db  schema
 -- ===================================================================
--- Design decisions LOCKED:
+-- Design decisions:
 --   * policy_simulation is WIDE (2 policies, 1 model, no extension)
 --   * post identity = global ap_id, UNIQUE, dedup at write time
 --   * raw LLM response stored as text (for debugging garbage output)
