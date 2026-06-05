@@ -271,18 +271,9 @@ def write_post(
         stats["posts_duplicate"] += 1
         return None
 
-    author_id = db.upsert_author(
-        platform="bluesky",
-        author_global_id=parsed["author_global_id"],
-        author_handle=parsed["author_handle"],
-        created_at=parsed.get("author_created_at"),
-    )
-    stats["authors_seen"] += 1
-
     post_id = db.upsert_post(
         ap_id=parsed["ap_id"],
         platform="bluesky",
-        author_id=author_id,
         origin_instance=parsed["origin_instance"],
         collecting_instance=parsed["collecting_instance"],
         community=parsed["community"],
@@ -316,7 +307,6 @@ def write_post(
             post_id=post_id,
             action_type=action_type,
             target_type="post",
-            self_deleted=0,
             actor_instance=lbl.get("src") or "bsky.social",
             observed_at=lbl.get("cts"),
         )
@@ -330,7 +320,6 @@ def write_post(
                 post_id=post_id,
                 action_type="deleted",
                 target_type="post",
-                self_deleted=0,
                 actor_instance="bsky.social",
             )
             stats["mod_events"] += 1
@@ -345,7 +334,6 @@ def collect_bluesky(
     check_tombstones: bool = False,
 ) -> dict[str, int]:
     stats: dict[str, int] = {
-        "authors_seen": 0,
         "posts_new": 0,
         "posts_duplicate": 0,
         "posts_skipped_lang": 0,
@@ -416,17 +404,6 @@ def main():
                 "Note: some Ozone labelers require auth to expose label values."
             )
 
-        run_id = db.start_run(
-            platform="bluesky",
-            instances="bsky.social",
-            window_start=datetime.now(timezone.utc).isoformat(),
-            notes=(
-                f"categories={CATEGORIES} "
-                f"per_category={args.per_category} "
-                f"check_tombstones={args.check_tombstones}"
-            ),
-        )
-
         try:
             stats = collect_bluesky(
                 db=db,
@@ -438,8 +415,6 @@ def main():
         except Exception as e:
             logger.error("Collection failed: %s", e)
             raise
-        finally:
-            db.end_run(run_id)
 
 
 if __name__ == "__main__":

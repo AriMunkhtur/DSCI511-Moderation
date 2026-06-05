@@ -178,7 +178,6 @@ def fetch_modlog_categorised(
                 "actor_instance": actor_instance,
                 "observed_at": action.get("when_"),
                 "target_type": "post",
-                "self_deleted": 0,
                 "reason": reason,
                 "category": category,
             })
@@ -274,11 +273,13 @@ def _guess_mime(url: str) -> Optional[str]:
 
 
 def infer_mod_action(parsed: dict) -> Optional[str]:
-    """Return the most severe current mod state, or None if unmoderated."""
+    """
+    Return the most severe current platform mod state, or None if unmoderated.
+    User self-deletions (post.deleted) are NOT platform decisions, so they
+    are not recorded in moderation_observed under this schema.
+    """
     if parsed.get("_removed"):
         return "removed"
-    if parsed.get("_deleted"):
-        return None  # handled separately with self_deleted=1
     if parsed.get("_locked"):
         return "locked"
     if parsed.get("_nsfw"):
@@ -328,16 +329,9 @@ def write_modlog_entry(
         time.sleep(RATE_LIMIT_SECS)
 
         parsed = parse_post(raw, collecting_instance=instance)
-        author_id = db.upsert_author(
-            platform="lemmy",
-            author_global_id=parsed["author_global_id"],
-            author_handle=parsed["author_handle"],
-            created_at=parsed.get("author_created_at"),
-        )
         post_id = db.upsert_post(
             ap_id=parsed["ap_id"],
             platform="lemmy",
-            author_id=author_id,
             origin_instance=parsed["origin_instance"],
             collecting_instance=instance,
             community=parsed["community"],
@@ -362,7 +356,6 @@ def write_modlog_entry(
         post_id=post_id,
         action_type=entry["action_type"],
         target_type=entry["target_type"],
-        self_deleted=entry["self_deleted"],
         actor_instance=entry["actor_instance"],
         observed_at=entry.get("observed_at"),
     )
@@ -377,7 +370,6 @@ def collect_instance(
     per_category_target: int = PER_CATEGORY_TARGET,
 ) -> dict[str, int]:
     stats = {
-        "authors_seen": 0,
         "posts_new": 0,
         "posts_duplicate": 0,
         "mod_events": 0,
@@ -437,18 +429,9 @@ def collect_instance(
                 stats["posts_duplicate"] += 1
                 continue
 
-            author_id = db.upsert_author(
-                platform="lemmy",
-                author_global_id=parsed["author_global_id"],
-                author_handle=parsed["author_handle"],
-                created_at=parsed.get("author_created_at"),
-            )
-            stats["authors_seen"] += 1
-
             post_id = db.upsert_post(
                 ap_id=parsed["ap_id"],
                 platform="lemmy",
-                author_id=author_id,
                 origin_instance=parsed["origin_instance"],
                 collecting_instance=instance,
                 community=parsed["community"],
@@ -472,16 +455,6 @@ def collect_instance(
                     post_id=post_id,
                     action_type=action,
                     target_type="post",
-                    self_deleted=0,
-                    actor_instance=instance,
-                )
-                stats["mod_events"] += 1
-            elif parsed.get("_deleted"):
-                db.insert_mod_event(
-                    post_id=post_id,
-                    action_type="deleted",
-                    target_type="post",
-                    self_deleted=1,
                     actor_instance=instance,
                 )
                 stats["mod_events"] += 1
@@ -558,17 +531,6 @@ def main():
                     instance,
                 )
 
-            run_id = db.start_run(
-                platform="lemmy",
-                instances=instance,
-                window_start=datetime.now(timezone.utc).isoformat(),
-                notes=(
-                    f"categories={CATEGORIES} "
-                    f"per_category={args.per_category} "
-                    f"communities={args.communities or 'local'}"
-                ),
-            )
-
             try:
                 stats = collect_instance(
                     db=db,
@@ -581,8 +543,6 @@ def main():
             except Exception as e:
                 logger.error("[%s] Collection failed: %s", instance, e)
                 raise
-            finally:
-                db.end_run(run_id)
 
             session.headers.pop("Authorization", None)
 
