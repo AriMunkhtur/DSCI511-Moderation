@@ -1,3 +1,5 @@
+"""SQLite write layer for database (posts, moderation_observed, media)."""
+
 import sqlite3
 import logging
 from datetime import datetime, timezone
@@ -7,23 +9,23 @@ logger = logging.getLogger(__name__)
 
 
 def _utcnow() -> str:
+    """Current UTC time as an ISO8601 string."""
     return datetime.now(timezone.utc).isoformat()
 
 
 class DB:
     """
     Thin wrapper around sqlite3 for moderation.db writes.
-
-    Matches the 3-table collector schema:
-        posts                — one row per unique post (ap_id is the identity)
-        moderation_observed  — platform decisions; 0 rows = unmoderated
-        media                — media URLs only (no bytes), deduped by sha256
-
-    There is no authors / policy_simulation / collection_meta table in this
-    schema — those are added later when the LLM runner needs them.
     """
 
     def __init__(self, db_path: str = "moderation.db"):
+        """
+        Open a connection to the SQLite file and prepare it for writing.
+
+        Enables foreign keys (off by default in SQLite, and required for the
+        CASCADE deletes), switches to WAL journal mode for better write
+        concurrency, then ensures the schema exists.
+        """
         self.path = db_path
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
@@ -33,6 +35,13 @@ class DB:
         logger.info("Connected to %s", db_path)
 
     def _ensure_schema(self) -> None:
+        """
+        Create the three tables and their indexes if they don't exist.
+
+        Ensures idempotency, so it's safe to call on every connection.
+        Foreign keys use ON DELETE CASCADE: deleting a post also removes
+        its moderation_observed and media rows.
+        """
         self.conn.executescript("""
             PRAGMA foreign_keys = ON;
 
@@ -81,9 +90,7 @@ class DB:
         self.conn.commit()
         logger.debug("Schema verified / created.")
 
-    # ------------------------------------------------------------------
-    # posts
-    # ------------------------------------------------------------------
+    # Posts table methods
 
     def upsert_post(
         self,
@@ -100,7 +107,15 @@ class DB:
         score: Optional[int] = None,
         created_at: Optional[str] = None,
     ) -> Optional[int]:
-        """Insert post if ap_id is new. Returns post_id, or None if duplicate."""
+        """
+        Insert a post, keyed by its globally-unique ap_id.
+
+        Uses INSERT OR IGNORE so a post already in the table is left untouched
+        rather than overwritten. `collected_at` defaults to now (UTC) if omitted.
+
+        Returns:
+            The new post_id on insert, or None if the ap_id already existed
+        """
         collected_at = collected_at or _utcnow()
 
         cur = self.conn.execute(
@@ -117,6 +132,8 @@ class DB:
         )
         self.conn.commit()
 
+        # A real insert sets lastrowid and rowcount=1; an ignored duplicate
+        # leaves rowcount=0, so this distinguishes "inserted" from "already there".
         if cur.lastrowid and cur.rowcount > 0:
             return cur.lastrowid
 
@@ -124,20 +141,31 @@ class DB:
         return None
 
     def get_post_id(self, ap_id: str) -> Optional[int]:
+        """
+        Look up the internal post_id for a post's ap_id.
+
+        Used when a moderation event references a post that may already be
+        stored (e.g. the Lemmy modlog pass linking back to a collected post).
+        Returns None if the post isn't in the table.
+        """
         row = self.conn.execute(
             "SELECT post_id FROM posts WHERE ap_id = ?", (ap_id,)
         ).fetchone()
         return row["post_id"] if row else None
 
     def post_exists(self, ap_id: str) -> bool:
+        """
+        Fast existence check for a post's ap_id.
+
+        Cheaper than upsert_post when the caller only needs to know whether to
+        skip a post — the collectors call this before doing any parsing work.
+        """
         row = self.conn.execute(
             "SELECT 1 FROM posts WHERE ap_id = ? LIMIT 1", (ap_id,)
         ).fetchone()
         return row is not None
 
-    # ------------------------------------------------------------------
-    # moderation_observed
-    # ------------------------------------------------------------------
+    # Moderation Observed table methods
 
     def insert_mod_event(
         self,
@@ -147,7 +175,14 @@ class DB:
         target_type: str = "post",
         actor_instance: Optional[str] = None,
     ) -> int:
-        """Append a platform moderation event for a post."""
+        """
+        Record a platform moderation decision against a post.
+
+        A post can have multiple events (e.g. labeled then removed), so this
+        always inserts a new row rather than deduping.
+
+        Returns the new mod_id.
+        """
         observed_at = observed_at or _utcnow()
         cur = self.conn.execute(
             """
@@ -160,9 +195,7 @@ class DB:
         self.conn.commit()
         return cur.lastrowid
 
-    # ------------------------------------------------------------------
-    # media
-    # ------------------------------------------------------------------
+    # Media table methods
 
     def insert_media(
         self,
@@ -171,7 +204,14 @@ class DB:
         source_url: Optional[str] = None,
         mime: Optional[str] = None,
     ) -> Optional[int]:
-        """Insert a media row. Silently skips duplicates (same post + sha256)."""
+        """
+        Record one media item attached to a post.
+
+        Deduped on (post_id, sha256) via INSERT OR IGNORE, so the same image on
+        the same post is only stored once. sha256 is currently the hash of the source URL.
+
+        Returns the new media_id, or None if it was a duplicate.
+        """
         cur = self.conn.execute(
             """
             INSERT OR IGNORE INTO media
@@ -183,16 +223,17 @@ class DB:
         self.conn.commit()
         return cur.lastrowid if cur.rowcount > 0 else None
 
-    # ------------------------------------------------------------------
-    # lifecycle
-    # ------------------------------------------------------------------
+    # Database lifecyle methods
 
     def close(self) -> None:
+        """Close the underlying SQLite connection."""
         self.conn.close()
         logger.info("DB connection closed.")
 
     def __enter__(self):
+        """Context-manager entry: return self."""
         return self
 
     def __exit__(self, *_):
+        """Context-manager exit: close the connection."""
         self.close()
