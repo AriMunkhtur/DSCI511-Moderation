@@ -33,7 +33,6 @@ policies_v2/
 
 1. Build the database:
    `sqlite3 moderation.db < schema.sql`
-   (or run `python smoke_test.py` to verify everything works first)
 
 2. Any code that connects to the DB must run
    `PRAGMA foreign_keys = ON` on every connection.
@@ -49,13 +48,13 @@ policies_v2/
 | Prompt builder              | Done, tested | Ari    |
 | Policy JSONs                | Done         | Ari    |
 | Collector (Bluesky + Lemmy) | Done         | Jayesh |
-| LLM runner (Ollama)         | Not built    | Ari    |
+| LLM runner (Ollama)         | Done         | Ari    |
 
 ## Locked design decisions
 
 - Platforms: Bluesky + Lemmy
 - Categories: violence, hate_speech, spam (only)
-- English only, 7-day collection window
+- English only
 - Storage: SQLite, single moderation.db
 - policy_simulation is WIDE (meta + x columns, one model)
-- Post dedup on global ap_id
+- Post deduplication on global ap_id
