@@ -1,11 +1,10 @@
-"""Collect category-relevant posts and Ozone labels from Bluesky into database."""
+"""Bluesky collector. Pulls posts by keyword + Ozone labels into the db."""
 
 import argparse
 import hashlib
 import logging
 import os
 import time
-from datetime import datetime, timezone
 from typing import Optional
 
 import requests
@@ -19,8 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initizaling the configuration
-
+# config
 BSKY_HOST = "https://bsky.social"
 XRPC = f"{BSKY_HOST}/xrpc"
 RATE_LIMIT_SECS = 0.5
@@ -29,7 +27,7 @@ TOTAL_TARGET = 3000
 CATEGORIES = ["violence", "hate_speech", "spam"]
 PER_CATEGORY_TARGET = TOTAL_TARGET // len(CATEGORIES)
 
-# Search queries per category - cycle through until bucket is full
+# search terms per category, cycled through until each bucket is full
 CATEGORY_QUERIES: dict[str, list[str]] = {
     "violence": [
         "graphic violence", "violent threat", "violent content warning",
@@ -48,8 +46,7 @@ CATEGORY_QUERIES: dict[str, list[str]] = {
     ],
 }
 
-# Map Ozone label values to our categories
-# Ref: https://docs.bsky.app/docs/advanced-guides/moderation
+# ozone label -> our category. docs: docs.bsky.app/docs/advanced-guides/moderation
 LABEL_TO_CATEGORY: dict[str, str] = {
     "violence":      "violence",
     "graphic-media": "violence",
@@ -64,12 +61,6 @@ LABEL_TO_CATEGORY: dict[str, str] = {
 
 
 def make_session() -> requests.Session:
-    """
-    Create a requests.Session preconfigured for this collector.
-
-    Sets a descriptive User-Agent and a JSON Accept header that are reused
-    across every request, including the auth token once login succeeds.
-    """
     s = requests.Session()
     s.headers.update({
         "User-Agent": "moderation-research-collector/1.0 (DSCI-511)",
@@ -78,15 +69,8 @@ def make_session() -> requests.Session:
     return s
 
 
-def login(session: requests.Session, username: str, password: str) -> Optional[str]:
-    """
-    Create a Bluesky session and attach the access JWT to the session.
-
-    Auth is optional for collection but lets some Ozone labelers expose label
-    values that are hidden from anonymous callers. Failures are logged and
-    no error thrown so collection proceeds publicly.
-    Returns the token or None.
-    """
+def login(session, username, password):
+    """auth is optional but some ozone labelers hide values from anonymous calls."""
     url = f"{XRPC}/com.atproto.server.createSession"
     try:
         r = session.post(url, json={"identifier": username, "password": password})
@@ -102,20 +86,12 @@ def login(session: requests.Session, username: str, password: str) -> Optional[s
         return None
 
 
-def fetch_search_posts(session: requests.Session, query: str,
-                       limit: int = 100, cursor: Optional[str] = None) -> tuple[list, Optional[str]]:
-    """
-    Run a single page of a full-text post search.
-
-    Returns a (posts, next_cursor) tuple; pass the cursor back in to page
-    through results. On error returns ([], None) so the caller stops cleanly.
-    Capped at 100 results per call (the API maximum).
-    """
+def fetch_search_posts(session, query, limit=100, cursor=None):
+    # returns (posts, next_cursor). max 100 per call.
     url = f"{XRPC}/app.bsky.feed.searchPosts"
     params = {"q": query, "limit": min(limit, 100)}
-    if cursor:   # continue from a previous page when a cursor is supplied
+    if cursor:
         params["cursor"] = cursor
-
     try:
         r = session.get(url, params=params, timeout=15)
         r.raise_for_status()
@@ -126,161 +102,119 @@ def fetch_search_posts(session: requests.Session, query: str,
         return [], None
 
 
-def check_post_status(session: requests.Session, at_uri: str) -> str:
-    """
-    Re-fetch a post by its AT URI to see whether it's still live.
-
-    Used by the optional tombstone check to spot posts that vanished after we
-    collected them. Returns one of: 'visible', 'not_found' (deleted/removed),
-    'blocked' (viewer-blocked), or 'error' (request failed).
-    """
+def check_post_status(session, at_uri):
+    """re-fetch a post by AT URI. used for tombstone detection."""
     url = f"{XRPC}/app.bsky.feed.getPosts"
     try:
         r = session.get(url, params={"uris": [at_uri]}, timeout=10)
-        if r.status_code == 400:   # malformed/unknown URI: treat as gone
+        if r.status_code == 400:
             return "not_found"
         r.raise_for_status()
         posts = r.json().get("posts", [])
-        if not posts:   # API returned nothing for the URI
+        if not posts:
             return "not_found"
         record_type = posts[0].get("$type", "")
-        if "notFound" in record_type:   # explicit tombstone marker
+        if "notFound" in record_type:
             return "not_found"
-        if "blocked" in record_type:   # viewer block/mute, not a mod removal
+        if "blocked" in record_type:
             return "blocked"
-        return "visible"   # post is still live
+        return "visible"
     except requests.RequestException as e:
         logger.debug("Status check failed for %s: %s", at_uri, e)
         return "error"
 
 
-def build_at_uri(did: str, collection: str, rkey: str) -> str:
-    """
-    Assemble an AT URI from its parts: at://<did>/<collection>/<rkey>.
-    """
+def build_at_uri(did, collection, rkey):
     return f"at://{did}/{collection}/{rkey}"
 
 
-def url_sha256(url: str) -> str:
-    """
-    Hash a media URL to use as the media table's dedup key.
-
-    Image bytes aren't downloaded at collection time, so the URL hash stands in
-    for a content hash - enough to avoid duplicate rows per post. Swap to a
-    bytes hash later if media gets downloaded.
-    """
+def url_sha256(url):
+    # not downloading bytes so we hash the URL instead. dedup key only.
     return hashlib.sha256(url.encode()).hexdigest()
 
 
-def extract_media(record: dict) -> list[dict]:
-    """
-    Collect media URLs from a post view's embed, as [{source_url, mime}].
-
-    Handles the embed shapes Bluesky uses: image sets (prefers fullsize over
-    thumb), external link cards (thumbnail, else the linked URL), video
-    (thumbnail), and recordWithMedia quote posts (recurses into the inner
-    media).
-    Returns an empty list when there's no embed.
-    """
-    media: list[dict] = []
+def extract_media(record):
+    """pulls media URLs out of the embed. handles images, link cards, video, recordWithMedia."""
+    media = []
     embed = record.get("embed")
-    if not embed:   # nothing attached to this post
+    if not embed:
         return media
 
     embed_type = embed.get("$type", "")
 
-    if "images" in embed_type:   # one or more inline images
+    if "images" in embed_type:
         for img in embed.get("images", []):
-            for key in ("fullsize", "thumb"):   # prefer fullsize, fall back to thumb
+            # fullsize first, fall back to thumb
+            for key in ("fullsize", "thumb"):
                 url = img.get(key)
                 if url:
                     media.append({"source_url": url, "mime": _guess_mime(url)})
-                    break   # taking one URL for this image, move to the next
+                    break
 
-    elif "external" in embed_type:   # link card
+    elif "external" in embed_type:
         ext = embed.get("external", {})
         thumb = ext.get("thumb")
         uri = ext.get("uri")
-        if thumb:   # use the card's preview image if present
+        if thumb:
             media.append({"source_url": thumb, "mime": _guess_mime(thumb)})
-        elif uri:   # otherwise fall back to the linked URL itself
+        elif uri:
             media.append({"source_url": uri, "mime": _guess_mime(uri)})
 
-    elif "video" in embed_type:   # store the video's poster frame
+    elif "video" in embed_type:
         thumb = embed.get("thumbnail")
         if thumb:
             media.append({"source_url": thumb, "mime": "image/jpeg"})
 
-    elif "recordWithMedia" in embed_type:   # quote post that also has media
+    elif "recordWithMedia" in embed_type:
+        # quote post + media, recurse into the inner thing
         inner = embed.get("media", {})
-        media.extend(extract_media({"embed": inner}))   # recurse into the inner embed
+        media.extend(extract_media({"embed": inner}))
 
     return media
 
 
-def _guess_mime(url: str) -> Optional[str]:
-    """
-    Guess a MIME type from a URL's file extension.
-
-    Guards against non-string input,strips any query string,
-    then matches common image/video extensions.
-    Returns None when unrecognised so the column stays null.
-    """
+def _guess_mime(url):
     if not isinstance(url, str):
         return None
-    url_lower = url.lower().split("?")[0]   # drop query string before matching
+    u = url.lower().split("?")[0]  # strip querystring
     for ext, mime in [
         (".jpg", "image/jpeg"), (".jpeg", "image/jpeg"),
         (".png", "image/png"),  (".gif", "image/gif"),
         (".webp", "image/webp"), (".mp4", "video/mp4"),
         (".webm", "video/webm"),
     ]:
-        if url_lower.endswith(ext):
-            return mime     # first matching extension
-    return None   # unknown extension
+        if u.endswith(ext):
+            return mime
+    return None
 
 
-def extract_platform_labels(post_view: dict) -> list[dict]:
-    """
-    Extract the active Ozone moderation labels from a post view.
-
-    Returns each label as {val, src, cts} - the label string, the labeler DID
-    that applied it, and its timestamp. Negated (retracted) labels and empty
-    values are filtered out, so only labels currently in force are returned.
-    """
-    raw_labels = post_view.get("labels", [])
+def extract_platform_labels(post_view):
+    """active ozone labels only. skips negated (retracted) ones."""
+    raw = post_view.get("labels", [])
     return [
         {"val": lbl.get("val", ""), "src": lbl.get("src", ""), "cts": lbl.get("cts")}
-        for lbl in raw_labels
-        # keep only labels that are still in force (not negated) and non-empty
+        for lbl in raw
         if not lbl.get("neg", False) and lbl.get("val")
     ]
 
 
-def parse_post_view(post_view: dict, collecting_instance: str = "bsky.social") -> Optional[dict]:
-    """
-    Flatten a Bluesky post view into the fields the DB layer expects.
-
-    Unwraps a feedViewPost wrapper if present, requires a valid at:// uri, and
-    skips non-English posts. Bluesky has no titles or communities, so those are null and likeCount is used as the score.
-    """
-    # Search results are postViews, but feeds wrap them as feedViewPost
+def parse_post_view(post_view, collecting_instance="bsky.social"):
+    """flattens a post_view into the dict shape db_writer expects. drops non-english."""
+    # search returns postViews, feeds wrap them in feedViewPost. unwrap if needed.
     if "post" in post_view and isinstance(post_view.get("post"), dict):
         post_view = post_view["post"]
 
     uri = post_view.get("uri", "")
-    if not uri or not uri.startswith("at://"):   # need a valid AT URI as the id
+    if not uri or not uri.startswith("at://"):
         return None
 
     author = post_view.get("author", {})
     record = post_view.get("record", {})
 
     langs = record.get("langs", [])
-    if langs and "en" not in langs:   # skip posts explicitly tagged as non-English
+    if langs and "en" not in langs:
         return None
 
-    did = author.get("did", "")
-    handle = author.get("handle", "")
     text = record.get("text", "")
     score = post_view.get("likeCount", 0)
     media_urls = extract_media(post_view)
@@ -288,16 +222,16 @@ def parse_post_view(post_view: dict, collecting_instance: str = "bsky.social") -
     platform_labels = extract_platform_labels(post_view)
 
     return {
-        "author_global_id": did,
-        "author_handle": handle,
+        "author_global_id": author.get("did", ""),
+        "author_handle": author.get("handle", ""),
         "author_created_at": author.get("createdAt"),
 
         "ap_id": uri,
         "platform": "bluesky",
         "origin_instance": "bsky.social",
         "collecting_instance": collecting_instance,
-        "community": None,
-        "title": None,
+        "community": None,  # bluesky has no communities
+        "title": None,      # no titles either
         "body": text,
         "lang": "en",
         "has_media": has_media,
@@ -310,47 +244,26 @@ def parse_post_view(post_view: dict, collecting_instance: str = "bsky.social") -
     }
 
 
-def collect_paginated(fetcher, target: int, cursor: Optional[str] = None) -> list[dict]:
-    """
-    Drive a cursor-paginated fetcher until `target` items are gathered.
-
-    `fetcher(cursor)` must return (items, next_cursor). Stops when the target
-    count is reached, the fetcher returns no items, or there's no next cursor.
-    Sleeps between pages to respect rate limits. Returns the accumulated items
-    """
-    all_items: list[dict] = []
-    while len(all_items) < target:   # keep paging until we have enough
+def collect_paginated(fetcher, target, cursor=None):
+    """walks a cursor-paginated fetcher until we have `target` items."""
+    all_items = []
+    while len(all_items) < target:
         items, cursor = fetcher(cursor)
-        if not items:   # empty page = no more results
+        if not items:
             break
         all_items.extend(items)
         logger.info("    Paginator: %d / %d (cursor: %s)",
                     len(all_items), target,
                     (cursor[:20] + "...") if cursor else "None")
-        if not cursor:   # no cursor = last page reached
+        if not cursor:
             break
         time.sleep(RATE_LIMIT_SECS)
     return all_items
 
 
-def write_post(
-    db: DB,
-    session: requests.Session,
-    parsed: dict,
-    stats: dict,
-    check_tombstones: bool = False,
-) -> Optional[int]:
-    """
-    Persist one parsed post plus its media and moderation labels.
-
-    Skips duplicates up front. After inserting the post it writes each media
-    URL and turns every Ozone label into a moderation_observed row ('!hide' ->
-    'removed', otherwise 'nsfw_labeled'). If check_tombstones is set and the
-    post has no labels, it re-fetches the post and logs a 'deleted' event when
-    it has vanished. Returns the new post_id, or None if it was a duplicate.
-    Updates the shared `stats` counters in place.
-    """
-    if db.post_exists(parsed["ap_id"]):   # already stored, skip before any writes
+def write_post(db, session, parsed, stats, check_tombstones=False):
+    """writes the post + media + ozone label events. returns post_id or None if dup."""
+    if db.post_exists(parsed["ap_id"]):
         stats["posts_duplicate"] += 1
         return None
 
@@ -368,14 +281,16 @@ def write_post(
         created_at=parsed["created_at"],
     )
 
-    if post_id is None:   # lost a race to a concurrent insert: count as duplicate
+    if post_id is None:
+        # race condition, another insert beat us
         stats["posts_duplicate"] += 1
         return None
     stats["posts_new"] += 1
 
-    for m in parsed.get("_media_urls", []):   # store each attached media item
+    # media
+    for m in parsed.get("_media_urls", []):
         url = m.get("source_url", "")
-        if url:   # skip entries with no usable URL
+        if url:
             db.insert_media(
                 post_id=post_id,
                 sha256=url_sha256(url),
@@ -383,9 +298,9 @@ def write_post(
                 mime=m.get("mime"),
             )
 
-    for lbl in parsed.get("_platform_labels", []):   # one mod event per Ozone label
+    # one mod event per label. !hide = hard takedown, others = nsfw-ish flag
+    for lbl in parsed.get("_platform_labels", []):
         val = lbl["val"]
-        # '!hide' is a hard takedown; any other label is a softer content flag
         action_type = "removed" if val == "!hide" else "nsfw_labeled"
         db.insert_mod_event(
             post_id=post_id,
@@ -396,11 +311,11 @@ def write_post(
         )
         stats["mod_events"] += 1
 
-    # Only bother re-fetching unlabeled posts when tombstone checking is on.
+    # only re-fetch unlabeled posts when tombstone check is on
     if check_tombstones and not parsed.get("_platform_labels"):
         status = check_post_status(session, parsed["_uri"])
         time.sleep(0.2)
-        if status == "not_found":   # post vanished after collection, log deletion
+        if status == "not_found":
             db.insert_mod_event(
                 post_id=post_id,
                 action_type="deleted",
@@ -412,99 +327,72 @@ def write_post(
     return post_id
 
 
-def collect_bluesky(
-    db: DB,
-    session: requests.Session,
-    per_category_target: int = PER_CATEGORY_TARGET,
-    check_tombstones: bool = False,
-) -> dict[str, int]:
-    """
-    Collect posts for all three categories via keyword search.
-
-    For each category it cycles through that category's search queries, paging
-    each one until the category reaches per_category_target, then moves on.
-    Every kept post is written with its media and labels via write_post.
-    English-only posts are fetched.
-    Returns a stats dict of counts for the run.
-    """
-    stats: dict[str, int] = {
+def collect_bluesky(db, session, per_category_target=PER_CATEGORY_TARGET, check_tombstones=False):
+    """main loop. fills each category bucket via keyword search."""
+    stats = {
         "posts_new": 0,
         "posts_duplicate": 0,
         "posts_skipped_lang": 0,
         "mod_events": 0,
     }
-    category_counts: dict[str, int] = {c: 0 for c in CATEGORIES}
+    category_counts = {c: 0 for c in CATEGORIES}
 
-    for category in CATEGORIES:   # fill each category's quota in turn
+    for category in CATEGORIES:
         queries = CATEGORY_QUERIES[category]
         logger.info("=== Category: %s (target: %d) ===", category, per_category_target)
 
-        for query in queries:   # try each search query until the bucket fills
+        for query in queries:
             if category_counts[category] >= per_category_target:
-                logger.info("  [%s] Target reached - moving to next category", category)
+                logger.info("  [%s] Target reached, moving on", category)
                 break
 
             remaining = per_category_target - category_counts[category]
-            logger.info("  [%s] Query: %r - need %d more posts", category, query, remaining)
+            logger.info("  [%s] Query: %r - need %d more", category, query, remaining)
 
-            # q=query binds the current query into the lambda (avoids late-binding)
+            # q=query fixes late binding
             fetcher = lambda cur, q=query: fetch_search_posts(session, q, cursor=cur)
             raw_items = collect_paginated(fetcher, target=remaining)
 
-            for raw in raw_items:   # write each search hit
+            for raw in raw_items:
                 if category_counts[category] >= per_category_target:
-                    break   # bucket filled mid-page, stop early
+                    break
                 parsed = parse_post_view(raw)
-                if parsed is None:   # non-English / invalid post
+                if parsed is None:
                     stats["posts_skipped_lang"] += 1
                     continue
                 post_id = write_post(db, session, parsed, stats, check_tombstones)
-                if post_id is not None:   # only count genuinely new posts
+                if post_id is not None:
                     category_counts[category] += 1
 
-            logger.info("  [%s] After query %r: %d / %d",
+            logger.info("  [%s] After %r: %d / %d",
                         category, query, category_counts[category], per_category_target)
             time.sleep(RATE_LIMIT_SECS)
 
-        logger.info("[%s] Final count: %d posts", category, category_counts[category])
+        logger.info("[%s] Final: %d posts", category, category_counts[category])
 
     logger.info("Category totals: %s", category_counts)
     return stats
 
 
 def main():
-    """
-    CLI entry point: parse args and run the Bluesky collection.
-
-    Opens one shared DB connection, optionally logs in (credentials via flags
-    or BSKY_USERNAME/BSKY_PASSWORD env vars), then runs collect_bluesky.
-    The --check-tombstones flag enables the slower per-post deletion check.
-    """
     parser = argparse.ArgumentParser(
         description="Collect Bluesky posts into moderation.db (3000 posts, 3 categories)"
     )
-    parser.add_argument("--per-category", type=int, default=PER_CATEGORY_TARGET,
-                        help=f"Posts to collect per category (default: {PER_CATEGORY_TARGET})")
+    parser.add_argument("--per-category", type=int, default=PER_CATEGORY_TARGET)
     parser.add_argument("--check-tombstones", action="store_true",
-                        help="Re-fetch each post to detect post-collection deletions (slow)")
-    parser.add_argument("--username", default=os.getenv("BSKY_USERNAME"),
-                        help="Bluesky handle for auth (optional)")
-    parser.add_argument("--password", default=os.getenv("BSKY_PASSWORD"),
-                        help="Bluesky app password for auth (optional)")
-    parser.add_argument("--db", default="moderation.db",
-                        help="Path to SQLite database file")
+                        help="re-fetch each post to detect deletions (slow)")
+    parser.add_argument("--username", default=os.getenv("BSKY_USERNAME"))
+    parser.add_argument("--password", default=os.getenv("BSKY_PASSWORD"))
+    parser.add_argument("--db", default="moderation.db")
     args = parser.parse_args()
 
     with DB(args.db) as db:
         session = make_session()
 
-        if args.username and args.password:   # auth can reveal more Ozone labels
+        if args.username and args.password:
             login(session, args.username, args.password)
         else:
-            logger.info(
-                "No credentials - collecting as public. "
-                "Note: some Ozone labelers require auth to expose label values."
-            )
+            logger.info("No credentials, running as public. Some ozone labels may be hidden.")
 
         try:
             stats = collect_bluesky(
