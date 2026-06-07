@@ -45,6 +45,8 @@ policies_v2/
 
 ## Run Commands
 
+cd into the src directory in this repo and use the below commands
+
 **Lemmy**
 
 Lemmy instances of your choice can be passed, separated by space.
