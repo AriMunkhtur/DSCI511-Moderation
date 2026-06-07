@@ -17,7 +17,6 @@ Code is explicitly typed to avoid errors during development.
 
 ```
 schema.sql              SQLite schema. Build the DB from this.
-smoke_test.py           Run first. Proves schema + environment work.
 src/
   prompt_builder_v2.py  Builds LLM prompts from policy + post. Pure, tested.
   collect_bluesky.py    Fetches data using the BlueSky API and stores it in DB.
