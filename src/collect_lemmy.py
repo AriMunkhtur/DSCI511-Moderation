@@ -1,4 +1,4 @@
-"""Collect category-flagged posts and moderation events from Lemmy into database."""
+"""Lemmy collector. Pulls posts + modlog removal events into the db."""
 
 import argparse
 import hashlib
@@ -7,7 +7,6 @@ import math
 import os
 import time
 from tqdm import tqdm
-from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -22,17 +21,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Setting the configuration for the collection
-
+# config
 API = "/api/v3"
 RATE_LIMIT_SECS = 0.5
 
-# Change below value to collect more posts
+# bump this to collect more
 TOTAL_TARGET = 1000
 CATEGORIES = ["violence", "hate_speech", "spam"]
 PER_CATEGORY_TARGET = TOTAL_TARGET // len(CATEGORIES)
 
-# Keywords matched against modlog removal reason - case-insensitive substring match
+# case-insensitive substring match against modlog removal reasons
 CATEGORY_KEYWORDS: dict[str, list[str]] = {
     "violence": [
         "violence", "violent", "threat", "threatening", "gore",
@@ -52,33 +50,18 @@ CATEGORY_KEYWORDS: dict[str, list[str]] = {
 }
 
 
-def classify_reason(reason: Optional[str]) -> Optional[str]:
-    """
-    Map a Lemmy modlog removal reason to one of our three categories.
-
-    Do a case-insensitive substring match against CATEGORY_KEYWORDS and
-    returns the first category that matches, checked in priority order
-    (violence > hate_speech > spam).
-    Returns None for empty reasons or reasons that don't match any keyword.
-    """
+def classify_reason(reason):
+    """maps a modlog reason string to one of the 3 categories. priority: violence > hate_speech > spam."""
     if not reason:
         return None
     lower = reason.lower()
-    # Check categories in dict order (violence > hate_speech > spam) and
-    # return the first whose keyword list has a hit in the reason text.
     for category, keywords in CATEGORY_KEYWORDS.items():
         if any(kw in lower for kw in keywords):
             return category
-    return None  # no keyword matched any category
+    return None
 
 
 def make_session() -> requests.Session:
-    """
-    Create a requests.Session preconfigured for this collector.
-
-    Sets a descriptive User-Agent and a JSON Accept header that are reused
-    across every request, including the auth token once login succeeds.
-    """
     s = requests.Session()
     s.headers.update({
         "User-Agent": "moderation-research-collector/1.0 (DSCI-511)",
@@ -87,22 +70,15 @@ def make_session() -> requests.Session:
     return s
 
 
-def login(session: requests.Session, instance: str,
-          username: str, password: str) -> Optional[str]:
-    """
-    Log in to a Lemmy instance and attach the JWT to the session.
-
-    On success the bearer token is set on the session headers so subsequent
-    requests are authenticated (which exposes removal reasons some instances
-    hide from anonymous users). Auth failures are logged and collection continues unauthenticated.
-    Returns the token or None.
-    """
+def login(session, instance, username, password):
+    """auth unlocks removal reasons that some instances hide from anon."""
+    """ wasnt used because most of the instances require verification that takes a long time"""
     url = f"https://{instance}{API}/user/login"
     try:
         r = session.post(url, json={"username_or_email": username, "password": password})
         r.raise_for_status()
         token = r.json().get("jwt")
-        if token:  # attach the bearer token so later requests are authenticated
+        if token:
             session.headers["Authorization"] = f"Bearer {token}"
             logger.info("[%s] Authenticated as %s", instance, username)
         return token
@@ -111,75 +87,59 @@ def login(session: requests.Session, instance: str,
         return None
 
 
-def fetch_posts(session: requests.Session, instance: str,
-                community_name: Optional[str] = None,
-                limit: int = 50, pages: int = 5) -> list[dict]:
-    """
-    Fetch recent posts from a Lemmy instance, newest first.
-
-    With a community_name it queries that community, without one it pulls the instance's Local feed.
-    Walks up to `pages` pages of `limit` posts each, sleeping between requests,
-    and stops early if a page comes back empty.
-    Returns the raw post_view dicts.
+def fetch_posts(session, instance, community_name=None, limit=50, pages=5):
+    """recent posts, newest first. community feed if name given, else Local.
+        This one wasnt also working, didnt get community stuff only got instances
     """
     all_posts = []
     url = f"https://{instance}{API}/post/list"
 
-    for page in range(1, pages + 1):  # walk pages until empty or limit hit
+    for page in range(1, pages + 1):
         params = {
             "type_": "Local",
             "sort": "New",
             "limit": limit,
             "page": page,
         }
-        if community_name:  # target a community instead of the local feed
+        if community_name:
             params["community_name"] = community_name
-            params["type_"] = "All"   # All = include federated posts in that community
+            params["type_"] = "All"  # All = include federated posts
 
         try:
             r = session.get(url, params=params, timeout=15)
             r.raise_for_status()
             posts = r.json().get("posts", [])
-            if not posts:  # empty page = no more results, stop paging
+            if not posts:
                 logger.info("[%s] No more posts at page %d", instance, page)
                 break
             all_posts.extend(posts)
-            logger.info("[%s] Page %d - fetched %d posts (total so far: %d)",
+            logger.info("[%s] Page %d - fetched %d posts (total: %d)",
                         instance, page, len(posts), len(all_posts))
-            time.sleep(RATE_LIMIT_SECS)   # be polite between requests
+            time.sleep(RATE_LIMIT_SECS)
         except requests.RequestException as e:
             logger.error("[%s] Post fetch error on page %d: %s", instance, page, e)
-            break   # give up this feed on error rather than spinning
+            break
 
     return all_posts
 
 
 def fetch_modlog_categorised(
-    session: requests.Session,
-    instance: str,
-    community_name: Optional[str] = None,
-    per_category_target: int = PER_CATEGORY_TARGET,
-    page_size: int = 50,
-) -> dict[str, list[dict]]:
-    """
-    Page through an instance's post-removal modlog, bucketed by category.
-
-    Reads ModRemovePost entries, classifies each by its removal reason via
-    classify_reason, and drops it into the matching category bucket.
-    Stops once every category bucket has reached per_category_target, or when the modlog is exhausted.
-
-    Returns a dict mapping each category to a list of lightweight entry dicts carrying the ap_id, 
-    numeric Lemmy id, action_type, actor instance, timestamp, and reason for downstream writing.
-    """
+    session,
+    instance,
+    community_name=None,
+    per_category_target=PER_CATEGORY_TARGET,
+    page_size=50,
+):
+    """walks the post-removal modlog, buckets entries by category via classify_reason."""
     url = f"https://{instance}{API}/modlog"
     buckets: dict[str, list] = {cat: [] for cat in CATEGORIES}
     buckets["unclassified"] = []
 
     page = 1
     while True:
-        # Stop as soon as every category has hit its target - no need to keep paging.
+        # stop when every bucket is full
         if all(len(buckets[c]) >= per_category_target for c in CATEGORIES):
-            logger.info("[%s] All category buckets full - stopping modlog fetch", instance)
+            logger.info("[%s] All buckets full, stopping modlog fetch", instance)
             break
 
         params: dict = {
@@ -187,7 +147,7 @@ def fetch_modlog_categorised(
             "page": page,
             "type_": "ModRemovePost",
         }
-        if community_name:  # restrict the modlog to one community if asked
+        if community_name:
             params["community_name"] = community_name
 
         try:
@@ -196,25 +156,25 @@ def fetch_modlog_categorised(
             entries = r.json().get("removed_posts", [])
         except requests.RequestException as e:
             logger.error("[%s] Modlog fetch error (page %d): %s", instance, page, e)
-            break   # network/API error - stop paging this instance
+            break
 
-        if not entries:  # ran out of modlog entries
+        if not entries:
             logger.info("[%s] Modlog exhausted at page %d", instance, page)
             break
 
-        for entry in entries:  # classify and bucket each removal
+        for entry in entries:
             action = entry.get("mod_remove_post", {})
             reason = action.get("reason") or ""
             category = classify_reason(reason)
             bucket = category if category else "unclassified"
 
-            # Skip if this category is already full (but keep filling others).
+            # skip if this category is full, keep filling others
             if category and len(buckets[category]) >= per_category_target:
                 continue
 
             post = entry.get("post", {})
             moderator = entry.get("moderator") or {}
-            # Prefer the moderator's home instance; fall back to this instance.
+            # prefer moderator's home instance, fall back to this one
             actor_instance = (
                 extract_instance_from_ap_id(moderator.get("actor_id", ""))
                 or instance
@@ -223,7 +183,7 @@ def fetch_modlog_categorised(
             buckets[bucket].append({
                 "ap_id": post.get("ap_id", ""),
                 "_lemmy_post_id": post.get("id"),
-                # removed=True is the normal case; False means a restore action
+                # removed=True normal case, False = restore
                 "action_type": "removed" if action.get("removed", True) else "restored",
                 "actor_instance": actor_instance,
                 "observed_at": action.get("when_"),
@@ -233,26 +193,20 @@ def fetch_modlog_categorised(
             })
 
         totals = {c: len(buckets[c]) for c in CATEGORIES}
-        logger.info("[%s] Modlog page %d - category totals so far: %s", instance, page, totals)
+        logger.info("[%s] Modlog page %d - totals: %s", instance, page, totals)
         page += 1
         time.sleep(RATE_LIMIT_SECS)
 
     return buckets
 
 
-def fetch_single_post(session: requests.Session, instance: str,
-                      lemmy_post_id: int) -> Optional[dict]:
-    """
-    Fetch one post by its numeric Lemmy id.
-
-    Used during the modlog pass to recover a removed post that wasn't picked up
-    in the feed sweep (removed posts often don't appear in normal listings).
-    Returns the post_view dict, or None on 404 / request error.
-    """
+def fetch_single_post(session, instance, lemmy_post_id):
+    """fetch one post by numeric id. used to recover removed posts that don't show in feed sweeps."""
     url = f"https://{instance}{API}/post"
     try:
         r = session.get(url, params={"id": lemmy_post_id}, timeout=15)
-        if r.status_code == 404:  # post is fully gone, not just removed
+        if r.status_code == 404:
+            # post is gone, not just removed
             return None
         r.raise_for_status()
         return r.json().get("post_view")
@@ -261,39 +215,21 @@ def fetch_single_post(session: requests.Session, instance: str,
         return None
 
 
-def extract_instance_from_ap_id(ap_id: str) -> str:
-    """
-    Extract the host portion of an ActivityPub id URL.
-
-    e.g. 'https://lemmy.world/post/123' -> 'lemmy.world'. Used to derive the
-    origin instance of a post and the acting instance of a moderator. Returns
-    an empty string if the URL can't be parsed.
-    """
+def extract_instance_from_ap_id(ap_id):
+    # 'https://lemmy.world/post/123' -> 'lemmy.world'
     try:
         return urlparse(ap_id).netloc
     except Exception:
         return ""
 
 
-def url_sha256(url: str) -> str:
-    """
-    Hash a media URL to use as the media table's dedup key.
-
-    The image bytes aren't downloaded at collection time, so the URL hash
-    stands in for a content hash - enough to avoid storing the same URL twice
-    per post.
-    """
+def url_sha256(url):
+    # not downloading bytes, so we hash the URL itself for dedup
     return hashlib.sha256(url.encode()).hexdigest()
 
 
-def parse_post(raw: dict, collecting_instance: str) -> dict:
-    """
-    Flatten a raw Lemmy post_view into the fields the DB layer expects.
-
-    Pulls the post/creator/community/counts sub-objects apart, derives the
-    origin instance from the ap_id, and collects any media URLs (the post's
-    own url plus a distinct thumbnail).
-    """
+def parse_post(raw, collecting_instance):
+    """flattens a Lemmy post_view dict into the shape db_writer expects."""
     post = raw.get("post", {})
     creator = raw.get("creator", {})
     community = raw.get("community", {})
@@ -302,12 +238,12 @@ def parse_post(raw: dict, collecting_instance: str) -> dict:
     ap_id = post.get("ap_id", "")
     origin_instance = extract_instance_from_ap_id(ap_id)
 
-    media_urls: list[dict] = []
+    media_urls = []
     post_url = post.get("url")
     thumb_url = post.get("thumbnail_url")
-    if post_url:  # the linked image/article/video on the post
+    if post_url:
         media_urls.append({"source_url": post_url, "mime": _guess_mime(post_url)})
-    if thumb_url and thumb_url != post_url:  # separate thumbnail, avoid dupes
+    if thumb_url and thumb_url != post_url:  # separate thumb, skip if same
         media_urls.append({"source_url": thumb_url, "mime": "image/jpeg"})
 
     return {
@@ -335,54 +271,38 @@ def parse_post(raw: dict, collecting_instance: str) -> dict:
     }
 
 
-def _guess_mime(url: str) -> Optional[str]:
-    """
-    Guess a MIME type from a URL's file extension.
-
-    Strips any query string, then matches common image/video extensions.
-    Returns None if the extension isn't recognised.
-    """
+def _guess_mime(url):
     if not isinstance(url, str):
         return None
-    url_lower = url.lower().split("?")[0]   # drop query string before matching
+    u = url.lower().split("?")[0]  # strip querystring
     for ext, mime in [
         (".jpg", "image/jpeg"), (".jpeg", "image/jpeg"),
         (".png", "image/png"),  (".gif", "image/gif"),
         (".webp", "image/webp"), (".mp4", "video/mp4"),
         (".webm", "video/webm"),
     ]:
-        if url_lower.endswith(ext):  # first matching extension wins
+        if u.endswith(ext):
             return mime
-    return None   # unknown extension
+    return None
 
 
-def infer_mod_action(parsed: dict) -> Optional[str]:
-    """
-    Return the most severe current platform mod state, or None if unmoderated.
-    User self-deletions (post.deleted) are NOT platform decisions, so they
-    are not recorded in moderation_observed under this schema.
-    """
-    # Checked most-severe first so the strongest current state is reported.
+def infer_mod_action(parsed):
+    """most severe mod state currently visible, or None. user self-deletes aren't platform actions."""
+    # check severe first
     if parsed.get("_removed"):
         return "removed"
     if parsed.get("_locked"):
         return "locked"
     if parsed.get("_nsfw"):
         return "nsfw_labeled"
-    return None   # no platform action visible on the post
+    return None
 
 
-def write_media(db: DB, post_id: int, media_urls: list[dict]) -> int:
-    """
-    Write all media items for a post to the media table.
-
-    Iterates the parsed '_media_urls' list, hashing each URL for the dedup key
-    and skipping entries with no URL. Returns the number of rows actually inserted.
-    """
+def write_media(db, post_id, media_urls):
     inserted = 0
-    for m in media_urls:   # one row per media item on the post
+    for m in media_urls:
         url = m.get("source_url", "")
-        if not url:   # skip malformed entries with no URL
+        if not url:
             continue
         result = db.insert_media(
             post_id=post_id,
@@ -390,26 +310,13 @@ def write_media(db: DB, post_id: int, media_urls: list[dict]) -> int:
             source_url=url,
             mime=m.get("mime"),
         )
-        if result:   # None means it was a duplicate, so don't count it
+        if result:  # None = duplicate
             inserted += 1
     return inserted
 
 
-def write_modlog_entry(
-    db: DB,
-    session: requests.Session,
-    instance: str,
-    entry: dict,
-    stats: dict,
-) -> None:
-    """
-    Persist one modlog removal: make sure the post exists, then log the event.
-
-    If the post isn't already stored, this fetches it by numeric id and inserts it plus its media first.
-    Then it writes the moderation_observed row from the entry's action_type, actor instance, and timestamp.
-    Skips silently if the post can't be recovered.
-    Updates the shared `stats` counters in place.
-    """
+def write_modlog_entry(db, session, instance, entry, stats):
+    """log one modlog removal. fetches the post first if we don't have it yet."""
     ap_id = entry["ap_id"]
     if not ap_id:
         return
@@ -417,13 +324,13 @@ def write_modlog_entry(
     post_id = db.get_post_id(ap_id)
 
     if post_id is None:
-        # Post was not caught by the feed sweep (often because it was already
-        # removed), so fetch it directly by its numeric Lemmy id.
+        # post wasn't in the feed sweep (usually because it's removed). fetch by id.
         lemmy_id = entry.get("_lemmy_post_id")
-        if not lemmy_id:   # nothing to fetch with - give up on this entry
+        if not lemmy_id:
             return
         raw = fetch_single_post(session, instance, lemmy_id)
-        if raw is None:   # post is fully gone, can't recover it
+        if raw is None:
+            # post is fully gone, give up
             return
         time.sleep(RATE_LIMIT_SECS)
 
@@ -441,14 +348,15 @@ def write_modlog_entry(
             score=parsed["score"],
             created_at=parsed["created_at"],
         )
-        if post_id:   # freshly inserted - also store its media
+        if post_id:
             write_media(db, post_id, parsed.get("_media_urls", []))
             stats["posts_new"] += 1
-        else:   # a concurrent insert beat us; re-read the existing id
+        else:
+            # race condition, re-read
             post_id = db.get_post_id(ap_id)
             stats["posts_duplicate"] += 1
 
-    if post_id is None:   # still nothing to attach the event to
+    if post_id is None:
         return
 
     db.insert_mod_event(
@@ -461,21 +369,8 @@ def write_modlog_entry(
     stats["mod_events"] += 1
 
 
-def collect_instance(
-    db: DB,
-    session: requests.Session,
-    instance: str,
-    communities: list[str],
-    per_category_target: int = PER_CATEGORY_TARGET,
-) -> dict[str, int]:
-    """
-    Collect from a single Lemmy instance across its target communities.
-
-    Two passes per community: first the categorised modlog, then a feed
-    sweep of recent posts to top up towards the TOTAL_TARGET. Each new post also gets
-    its media stored and its current moderation state logged. Non-English posts are skipped.
-    Returns a stats dict of counts for the run.
-    """
+def collect_instance(db, session, instance, communities, per_category_target=PER_CATEGORY_TARGET):
+    """collect from one Lemmy instance. two passes per community: modlog, then feed sweep."""
     stats = {
         "posts_new": 0,
         "posts_duplicate": 0,
@@ -483,57 +378,55 @@ def collect_instance(
         "posts_skipped_lang": 0,
     }
 
-    # No communities given -> sweep each instance's local feed (None sentinel).
+    # no communities = sweep local feed only
     targets = communities if communities else [None]
 
     for community in targets:
         label = community or "<local feed>"
         logger.info("[%s] === Community: %s ===", instance, label)
 
-        # Pass 1 - modlog: category-labelled removals
-        logger.info("[%s/%s] Pass 1: fetching categorised modlog...", instance, label)
+        # pass 1: modlog (categorised removals)
+        logger.info("[%s/%s] Pass 1: modlog...", instance, label)
         buckets = fetch_modlog_categorised(
             session, instance, community,
             per_category_target=per_category_target,
         )
 
-        for category in CATEGORIES:   # write each category's removals
+        for category in CATEGORIES:
             entries = buckets[category]
-            logger.info("[%s/%s] Category '%s': %d modlog entries",
+            logger.info("[%s/%s] Category '%s': %d entries",
                         instance, label, category, len(entries))
             for entry in tqdm(entries):
                 write_modlog_entry(db, session, instance, entry, stats)
 
-        # Pass 2 - community feed sweep to fill remaining quota
+        # pass 2: feed sweep to top up
         total_collected = stats["posts_new"]
         remaining = max(0, TOTAL_TARGET - total_collected)
-        if remaining == 0:   # modlog alone already hit the target
-            logger.info("[%s/%s] Target reached via modlog - skipping feed sweep", instance, label)
+        if remaining == 0:
+            logger.info("[%s/%s] Target hit via modlog, skipping feed", instance, label)
             continue
 
         page_size = 50
         pages_needed = math.ceil(remaining // page_size)
-        logger.info(
-            "[%s/%s] Pass 2: feed sweep for ~%d more posts (%d pages)",
-            instance, label, remaining, pages_needed,
-        )
+        logger.info("[%s/%s] Pass 2: feed sweep for ~%d more (%d pages)",
+                    instance, label, remaining, pages_needed)
 
         raw_posts = _fetch_posts_paged(
             session, instance, community,
             page_size=page_size, max_pages=pages_needed,
         )
-        logger.info("[%s/%s] Processing %d post_views from feed", instance, label, len(raw_posts))
+        logger.info("[%s/%s] Processing %d post_views", instance, label, len(raw_posts))
 
-        for raw in raw_posts:   # process each post from the feed sweep
+        for raw in raw_posts:
             parsed = parse_post(raw, collecting_instance=instance)
 
-            # language_id 37 = English, 0 = undetermined
+            # language_id: 37 = English, 0 = unknown
             lang_id = parsed.get("lang")
-            if lang_id is not None and lang_id not in (0, 37):  # drop non-English
+            if lang_id is not None and lang_id not in (0, 37):
                 stats["posts_skipped_lang"] += 1
                 continue
 
-            if db.post_exists(parsed["ap_id"]):   # already stored, skip
+            if db.post_exists(parsed["ap_id"]):
                 stats["posts_duplicate"] += 1
                 continue
 
@@ -551,14 +444,14 @@ def collect_instance(
                 created_at=parsed["created_at"],
             )
 
-            if post_id is None:   # lost to another insert - count as dup
+            if post_id is None:
                 stats["posts_duplicate"] += 1
                 continue
             stats["posts_new"] += 1
 
             write_media(db, post_id, parsed.get("_media_urls", []))
             action = infer_mod_action(parsed)
-            if action:   # only log a mod event if the post shows a platform action
+            if action:
                 db.insert_mod_event(
                     post_id=post_id,
                     action_type=action,
@@ -570,38 +463,26 @@ def collect_instance(
     return stats
 
 
-def _fetch_posts_paged(
-    session: requests.Session,
-    instance: str,
-    community_name: Optional[str],
-    page_size: int = 50,
-    max_pages: int = 60,
-) -> list[dict]:
-    """
-    Page through a Lemmy feed and return the raw post_views.
-
-    Like fetch_posts but capped by max_pages and used by the feed-sweep stage.
-    Queries the community feed when given a name, otherwise the Local feed,
-    sleeping between pages and stopping early on an empty page.
-    """
-    all_posts: list[dict] = []
+def _fetch_posts_paged(session, instance, community_name, page_size=50, max_pages=60):
+    """like fetch_posts but with max_pages cap. used in the feed sweep stage."""
+    all_posts = []
     url = f"https://{instance}{API}/post/list"
 
-    for page in range(1, max_pages + 1):   # bounded paging (unlike fetch_posts)
+    for page in range(1, max_pages + 1):
         params: dict = {
-            "type_": "All" if community_name else "Local",   # All reaches federated content
+            "type_": "All" if community_name else "Local",
             "sort": "New",
             "limit": page_size,
             "page": page,
         }
-        if community_name:   # scope to a single community when given
+        if community_name:
             params["community_name"] = community_name
 
         try:
             r = session.get(url, params=params, timeout=15)
             r.raise_for_status()
             posts = r.json().get("posts", [])
-            if not posts:   # empty page = end of feed
+            if not posts:
                 break
             all_posts.extend(posts)
             logger.info("[%s] Feed page %d - %d posts (total: %d)",
@@ -609,49 +490,33 @@ def _fetch_posts_paged(
             time.sleep(RATE_LIMIT_SECS)
         except requests.RequestException as e:
             logger.error("[%s] Feed fetch error (page %d): %s", instance, page, e)
-            break   # stop on error
+            break
 
     return all_posts
 
 
 def main():
-    """
-    CLI entry point: parse args and collect from each Lemmy instance.
-
-    Opens one shared DB connection, optionally logs in (credentials via flags
-    or LEMMY_USERNAME/LEMMY_PASSWORD env vars), then runs collect_instance for
-    every instance, clearing the auth header between instances.
-    """
     parser = argparse.ArgumentParser(description="Collect Lemmy posts into moderation.db")
-    parser.add_argument("--instances", nargs="+", default=["lemmy.world"],
-                        help="Lemmy instance hostnames to collect from")
-    parser.add_argument("--communities", nargs="*", default=[],
-                        help="Community names to target")
-    parser.add_argument("--per-category", type=int, default=PER_CATEGORY_TARGET,
-                        help=f"Posts to collect per category (default: {PER_CATEGORY_TARGET})")
-    parser.add_argument("--username", default=os.getenv("LEMMY_USERNAME"),
-                        help="Lemmy username for auth (optional but recommended)")
-    parser.add_argument("--password", default=os.getenv("LEMMY_PASSWORD"),
-                        help="Lemmy password for auth (optional but recommended)")
-    parser.add_argument("--db", default="moderation.db",
-                        help="Path to SQLite database file")
+    parser.add_argument("--instances", nargs="+", default=["lemmy.world"])
+    parser.add_argument("--communities", nargs="*", default=[])
+    parser.add_argument("--per-category", type=int, default=PER_CATEGORY_TARGET)
+    parser.add_argument("--username", default=os.getenv("LEMMY_USERNAME"))
+    parser.add_argument("--password", default=os.getenv("LEMMY_PASSWORD"))
+    parser.add_argument("--db", default="moderation.db")
     args = parser.parse_args()
 
     with DB(args.db) as db:
         session = make_session()
 
-        for instance in args.instances:   # collect from each instance in turn
-            logger.info("=== Starting collection: %s (target: %d per category) ===",
+        for instance in args.instances:
+            logger.info("=== Collecting from %s (target: %d per category) ===",
                         instance, args.per_category)
 
-            if args.username and args.password:   # auth unlocks removal reasons
+            if args.username and args.password:
                 login(session, instance, args.username, args.password)
             else:
-                logger.info(
-                    "[%s] No credentials - collecting as anonymous. "
-                    "Note: some instances hide removal reasons without auth.",
-                    instance,
-                )
+                logger.info("[%s] No creds, running anonymous. Some removal reasons may be hidden.",
+                            instance)
 
             try:
                 stats = collect_instance(
@@ -666,7 +531,7 @@ def main():
                 logger.error("[%s] Collection failed: %s", instance, e)
                 raise
 
-            # Drop this instance's token before moving to the next one.
+            # drop token before next instance
             session.headers.pop("Authorization", None)
 
 
