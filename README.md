@@ -9,7 +9,9 @@ and policy-as-prompt judgments diverge.
 ## What is / is NOT in this repo
 
 This repo contains **code and structure only**. The collected dataset,
-images, and LLM outputs are intentionally absent
+images, and LLM outputs are intentionally absent.
+
+Code is explicitly typed to avoid errors during development.
 
 ## Structure
 
