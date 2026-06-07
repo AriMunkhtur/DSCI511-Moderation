@@ -13,6 +13,8 @@ images, and LLM outputs are intentionally absent.
 
 Code is explicitly typed to avoid errors during development.
 
+Documentation for the code can be found inside each file.
+
 ## Structure
 
 ```
@@ -40,6 +42,25 @@ policies_v2/
 
 3. Post identity is the global `ap_id`, UNIQUE. Always insert posts with
    `INSERT OR IGNORE` — this dedupes federated Lemmy copies.
+
+## Run Commands
+
+```bash
+python collect_lemmy.py \
+    --instances lemmy.world hexbear.net lemmy.ml \
+    --username <myuser> \
+    --password <mypass> \
+    --db <database_name.db>
+```
+
+```bash
+python collect_bluesky.py \
+    --username <handle.bsky.social> \
+    --password <yourapppassword> \
+    --db <database_name.db>
+```
+
+Lemmy instances of your choice can be passed, separated by space.
 
 ## Components
 
