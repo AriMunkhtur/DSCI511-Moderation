@@ -45,6 +45,10 @@ policies_v2/
 
 ## Run Commands
 
+**Lemmy**
+
+Lemmy instances of your choice can be passed, separated by space.
+
 ```bash
 python collect_lemmy.py \
     --instances lemmy.world hexbear.net lemmy.ml \
@@ -53,14 +57,14 @@ python collect_lemmy.py \
     --db <database_name.db>
 ```
 
+**Bluesky**
+
 ```bash
 python collect_bluesky.py \
     --username <handle.bsky.social> \
     --password <yourapppassword> \
     --db <database_name.db>
 ```
-
-Lemmy instances of your choice can be passed, separated by space.
 
 ## Components
 
