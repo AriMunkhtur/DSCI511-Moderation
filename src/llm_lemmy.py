@@ -2,7 +2,7 @@
 llm_lemmy.py - Lemmy-only LLM runner.
 
 The main llm_runner.py used ORDER BY post_id ASC + LIMIT which picked only Bluesky
-posts for the first 1000-post run (Bluesky post_ids are 1-3000, Lemmy is 3001-4164).
+posts for the first 1000 post run (Bluesky post_ids are 1-3000, Lemmy is 3001-4164 because bluesky was run 1st).
 This script targets Lemmy only to fix that gap.
 
 Also uses a text-bearing filter (body OR title non-empty) instead of has_media=0,
