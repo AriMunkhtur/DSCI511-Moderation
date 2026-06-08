@@ -1,53 +1,47 @@
 """
-prompt_builder.py  (v2 - aligned to policies_v2 schema)
+prompt_builder_v2.py
 
-Converts a policy JSON + a post into a single rigidly-structured prompt
-string for the local LLM (Ollama).
+Takes a policy JSON + a post and builds a single structured prompt string
+for the local LLM (Ollama).
 
-WHY THIS EXISTS (Palla et al., FAccT 2025):
-The paper "Policy-as-Prompt" shows LLM moderation judgments are highly
-sensitive to HOW the policy is presented, not just WHAT it says. Key
-findings this builder operationalizes:
-  1. Structured, enumerated rules outperform prose policy blobs.
-     -> _numbered() forces every rule onto its own numbered line.
-  2. Explicit allowed/prohibited separation reduces over-removal.
-     -> prohibited, allowed, and context_required are SEPARATE sections.
-  3. Formatting must be deterministic across runs for reproducibility.
-     -> same JSON always renders byte-identical prompt text.
-  4. Context-dependent rules must be stated, not implied, or the model
-     over-flags. -> context_required is injected as its own section
-     (the OLD builder dropped this; that was a correctness bug).
+Why v2: the original builder dumped policy text in as a big prose block,
+which Palla et al. (FAccT 2025, "Policy-as-Prompt") show is the wrong
+move  LLMs are sensitive to how the policy is presented, not just
+what it says. Three things from that paper drive this builder:
 
-v2 schema keys (policies_v2/<platform>/<category>.json):
-  policy_name, policy_rationale, prohibited[], allowed[],
-  context_required[], examples_violating[], examples_allowed[],
-  enforcement
+  - Structured/numbered rules. So _numbered() renders every rule as its own numbered line.
+  - Prohibited and allowed need their own sections, not mixed together,
+    or the model over removes.
+  - Context dependent rules ("needs more signal") need their own
+    section too. The old builder skipped this, which was a real bug.
+
+v2 policy JSON schema (policies_v2/<platform>/<category>.json):
+    policy_name, policy_rationale, prohibited[], allowed[],
+    context_required[], examples_violating[], examples_allowed[],
+    enforcement
 """
 
 import json
 from pathlib import Path
 
-# Point at the v2 policies. Change this if you move the folder.
+
+# point at the v2 policies (change if folder moves)
 POLICY_DIR = Path(__file__).parent.parent / "policies_v2"
 PROMPT_DIR = Path(__file__).parent.parent / "prompts"
 
-MAX_BODY_CHARS = 2000  # Lemmy megathreads can be 10KB+; cap to protect context window.
+# Lemmy megathreads can be 10KB+ so we cap to protect the context window
+MAX_BODY_CHARS = 2000
 
-
-def _numbered(items: list[str]) -> str:
-    """
-    Render a list as numbered lines.
-
-    Palla et al.: enumerated rules >> prose. The number is not decorative;
-    it gives the model a discrete, countable unit to reason over and to
-    cite back in its reasoning field.
-    """
+  """Render a list as numbered lines for the prompt."""
+def _numbered(items):
+  
     if not items:
         return "  (none specified)"
     return "\n".join(f"  {i}. {line}" for i, line in enumerate(items, 1))
 
-
-def load_policy(platform: str, category: str) -> dict:
+"""Load one policy JSON from policies_v2/<platform>/<category>.json."""
+def load_policy(platform, category):
+    
     path = POLICY_DIR / platform / f"{category}.json"
     if not path.exists():
         raise FileNotFoundError(f"No policy JSON at {path}")
@@ -55,25 +49,20 @@ def load_policy(platform: str, category: str) -> dict:
         return json.load(f)
 
 
-def load_template(has_image: bool) -> str:
+def load_template(has_image):
+    """Pick the right prompt template based on whether the post has an image."""
     name = "template_vision.txt" if has_image else "template_text.txt"
     with open(PROMPT_DIR / name, "r", encoding="utf-8") as f:
         return f.read()
 
 
-def build_prompt(
-    platform: str,
-    category: str,
-    post_title: str,
-    post_text: str,
-    has_image: bool,
-) -> tuple[str, bool]:
+def build_prompt(platform: str, category: str, post_title: str,
+                 post_text: str, has_image: bool) -> tuple[str, bool]:
     """
-    Build the final prompt for one post under one platform policy.
+    Build the prompt for one post under one platform's policy.
 
-    platform: "meta" | "x"
-    category: "violence" | "hate_speech" | "spam"
-
+    platform: 'meta' or 'x'
+    category: 'violence', 'hate_speech', or 'spam'
     Returns (prompt_string, was_truncated).
     """
     policy = load_policy(platform, category)
@@ -84,7 +73,7 @@ def build_prompt(
         post_text = post_text[:MAX_BODY_CHARS] + " [TRUNCATED]"
         truncated = True
 
-    # context_required may be absent in some files; default to empty.
+    # context_required is optional in some policy files
     context_required = policy.get("context_required", [])
 
     filled = template.format(
@@ -92,11 +81,9 @@ def build_prompt(
         policy_name=policy["policy_name"],
         category=category,
         policy_rationale=policy["policy_rationale"],
-        # v2 key names: prohibited / allowed (NOT rules_do_not_post / rules_allowed)
+        # v2 key names: 'prohibited' and 'allowed' (not 'rules_do_not_post' etc)
         rules_do_not_post=_numbered(policy["prohibited"]),
         rules_allowed=_numbered(policy["allowed"]),
-        # NEW: context-dependent rules get their own section so the model
-        # knows these are "needs more signal" cases, not auto-removals.
         rules_context_required=_numbered(context_required),
         examples_violating=_numbered(policy["examples_violating"]),
         examples_allowed=_numbered(policy["examples_allowed"]),
@@ -107,7 +94,7 @@ def build_prompt(
 
     return filled, truncated
 
-
+# quick sanity check
 if __name__ == "__main__":
     p, trunc = build_prompt(
         platform="meta",
