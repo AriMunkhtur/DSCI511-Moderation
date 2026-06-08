@@ -1,12 +1,13 @@
 """
-llm_runner.py - Runs posts through gemma4 under Meta and X policies, stores verdicts.
+llm_runner.py 
+Runs posts through gemma4 under Meta and X policies, stores verdicts.
 
-Each post gets 6 LLM calls (3 categories x 2 policies) -> 3 rows in policy_simulation.
+Each post gets 6 LLM calls (3 categories x 2 policies) 3 rows in policy_simulation.
 Text-only in v1, skips posts with no body/title.
 
 Usage:
     python src/llm_runner.py
-    python src/llm_runner.py --limit 10   # smoke test
+    python src/llm_runner.py --limit 10  test only 10 to see if LLM is running correctly 
 
 Requires Ollama running locally with gemma4:latest pulled.
 """
