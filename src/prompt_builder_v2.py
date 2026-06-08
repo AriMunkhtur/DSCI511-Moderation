@@ -4,7 +4,7 @@ prompt_builder_v2.py
 Takes a policy JSON + a post and builds a single structured prompt string
 for the local LLM (Ollama).
 
-Why v2: the original builder dumped policy text in as a big prose block,
+Why v2: the original builder dumped policy text in as a big  block,
 which Palla et al. (FAccT 2025, "Policy-as-Prompt") show is the wrong
 move  LLMs are sensitive to how the policy is presented, not just
 what it says. Three things from that paper drive this builder:
